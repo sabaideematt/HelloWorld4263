@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class PlayerControl : MonoBehaviour
+public class PlayerControlOld:MonoBehaviour
 {
 	[HideInInspector]
 	public bool facingRight = true;			// For determining which way the player is currently facing.
@@ -21,8 +21,7 @@ public class PlayerControl : MonoBehaviour
 	public float jumpForce = 2000f;			  // Amount of force added when the player
 	public int jumpCount   = 0;               // Counter for the double jump
 	public bool grounded   = false;           // Check if player has hit the ground (or blocks)
-
-//	private Animator anim;					  // Reference to the player's animator component.
+    
 	private Rigidbody2D rb;                   // Will be a reference to the rigidbody of the player
 	private float h;                          // Will be a reference to the horizontal input 
 	private Animator myAnimator;              // reference to the animations 
@@ -36,7 +35,6 @@ public class PlayerControl : MonoBehaviour
 		// Setting up references.
 		rb = GetComponent<Rigidbody2D>();
 		myAnimator = GetComponent<Animator> ();
-//		anim = GetComponent<Animator>();  // No animations yet so ignore
 	}
 
 	void Update(){
