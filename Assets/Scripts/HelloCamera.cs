@@ -1,29 +1,26 @@
 using System;
 using UnityEngine;
 
-namespace UnityStandardAssets._2D
+public class HelloCamera:MonoBehaviour
 {
-    public class HelloCamera:MonoBehaviour
+    public float filterIntensity = 0f;
+    private Material filterMaterial;
+
+    private void Awake()
     {
-        public float filterIntensity = 0f;
-        private Material filterMaterial;
+        filterMaterial = new Material(Shader.Find("Hidden/BWDiffuse"));
+    }
 
-        private void Awake()
+    // Rendering Post-Process Effect
+    private void OnRenderImage(RenderTexture source, RenderTexture destination)
+    {
+        if (filterIntensity == 0)
         {
-            filterMaterial = new Material(Shader.Find("Hidden/BWDiffuse"));
+            Graphics.Blit(source, destination);
+            return;
         }
 
-        // Rendering Post-Process Effect
-        private void OnRenderImage(RenderTexture source, RenderTexture destination)
-        {
-            if (filterIntensity == 0)
-            {
-                Graphics.Blit(source, destination);
-                return;
-            }
-
-            filterMaterial.SetFloat("_bwBlend", filterIntensity);
-            Graphics.Blit(source, destination, filterMaterial);
-        }
+        filterMaterial.SetFloat("_bwBlend", filterIntensity/100);
+        Graphics.Blit(source, destination, filterMaterial);
     }
 }

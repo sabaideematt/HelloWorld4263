@@ -5,32 +5,46 @@ using UnityEngine.UI;
 public class PlayerController:MonoBehaviour
 {
     [HideInInspector]
-    public bool facingRight = true;         // For determining which way the player is currently facing.
+    public bool facingRight = true;         // Directional Facing
     [HideInInspector]
-    public bool jump = false;               // Condition for whether the player should jump.
-    private bool dashing = false;           // Is the player dashing?
+    public bool jump = false;               // Jump Input
+    private bool dashing = false;           // Dash Input
+    private float horizontalInput = 0;      // Horizontal Input Vectors
 
-    private float horizontalInput = 0;
+    // Gameplay Ability Flags
+    public bool hasDoubleJump = false;
+    public bool hasDash = false;
+    public bool hasGlimmer = false;
 
+    // Gameplay Physics Variables
     public float moveForce = 365f;          // Amount of force added to move the player left and right.
     public float maxSpeed = 6f;             // The fastest the player can travel in the x axis.
     public float dashForce = 20000f;        // Amount of force added to move the player left and right on a dash
-    public float jumpForce = 2000f;           // Amount of force added when the player
+    public float jumpForce = 2000f;         // Amount of force added when the player
 
+    // Player Conditionals
     public int jumpCount = 0;               // Counter for the double jump
+    private LayerMask triggerMask;          // Mask for Interactable Raycast Hitscan
     public bool grounded = false;           // Check if player has hit the ground (or blocks)
     private bool isWalking = false;         // Check if walking (for animations)
+    private bool onCooldown = false;        // If dash is on cooldown
+        private int dashCooldown = 3;       // Length of Dash cooldown in seconds
+        private int dashStartTime = 0;      // Cooldown time tracking
 
-    private Animator myAnimator;              // reference to the animations 
-    private Rigidbody2D rb;                   // RigidBody on Player
+    // Animation Variables
+    private Animator myAnimator;            // reference to the animations 
+    private Rigidbody2D rb;                 // RigidBody on Player
+    
+    // Player Collection Tracking
+    public int numPawPoints = 0;            // Track number of Paw Points collected
+    public int stressLevel = 0;             // Current Stress Level
+    public GameObject heldObject;           // For Tracking Puzzle 1 Objects
 
-    // DAF Added
-    public int dashCooldown = 3; // Length of Dash cooldown in seconds
-    private bool onCooldown = false; // If dash is on cooldown
-    private int dashStartTime = 0; // Cooldown time tracking
-
-    private LayerMask triggerMask;
-    private GameObject canvas;
+    // UI Elements
+    private GameObject canvas;              // Main Canvas
+    private Text PawPointText;              // PawPoints Indicator
+    private Text StressText;                // Stress Indicator
+    private HelloCamera playerCam;               // Camera Object (For Stress Filter)
 
 
     void Awake()
@@ -40,19 +54,26 @@ public class PlayerController:MonoBehaviour
         myAnimator = GetComponent<Animator>();  // No animations yet so ignore
 
         // Create LayerMask for Raycast Hit Detection
-        triggerMask = LayerMask.GetMask("Triggers");
+        triggerMask = LayerMask.GetMask("Interactable");
 
         // Get UI Canvas Reference
         canvas = GameObject.Find("UICanvas");
+        PawPointText = canvas.gameObject.transform.Find("PawPointText").GetComponent<Text>();
+        StressText = canvas.gameObject.transform.Find("StressText").GetComponent<Text>();
+        playerCam = this.gameObject.transform.Find("Main Camera").gameObject.GetComponent<HelloCamera>();
     }
 
     void Update()
     {
+        // Update UI Elements
+        PawPointText.text = "Paw Points: " + numPawPoints;
+        StressText.text = "Stress: " + stressLevel;
+        playerCam.filterIntensity = stressLevel;
+
         // Jump Checking 
         if (Input.GetKeyDown(KeyCode.Space))
         {
             jump = true;   // change jump to true for if statement in the FixedUpdate
-            jumpCount++;   // add to jumpCount so we can tell if player jumped more thance twice
         }
 
         // Dashing Checks
@@ -82,7 +103,7 @@ public class PlayerController:MonoBehaviour
                 direction = Vector2.right;
             else
                 direction = Vector2.left;
-            RaycastHit2D hit = Physics2D.Raycast(transform.position, direction, 20.0f, triggerMask);
+            RaycastHit2D hit = Physics2D.Raycast(transform.position, direction, 2.0f, triggerMask);
 
             // Hit Detected
             if (hit.collider)
@@ -94,15 +115,7 @@ public class PlayerController:MonoBehaviour
                 // Do We Want To Interact?
                 if (Input.GetKeyDown(KeyCode.F))
                 {
-                    if (target.tag == "DesatTrigger")
-                    {
-                        target.GetComponent<TriggerController>().Toggle();
-                    }
-                    else if (target.tag == "SemiTrigger")
-                    {
-                        Debug.Log("Entered Outline Section");
-                        target.gameObject.SetActive(false);
-                    }
+                    target.GetComponent<TriggerController>().interact(this.gameObject);
                 }
             }
             // No Hit
@@ -111,29 +124,6 @@ public class PlayerController:MonoBehaviour
                 canvas.transform.Find("InteractionText").GetComponent<Text>().text = "";
             }
 
-    }
-
-    // Check if player has collided with the ground objects
-    void OnCollisionEnter2D(Collision2D coll)
-    {
-        if (coll.gameObject.tag == "Ground")
-        {
-            grounded = true;
-            myAnimator.SetBool("jumping", false);
-            if (jumpCount > 0)
-                jumpCount = 0;
-        }
-
-    }
-
-    // Check if the player is no longer colliding with ground objects 
-    void OnCollisionExit2D(Collision2D coll)
-    {
-        if (coll.gameObject.tag == "Ground")
-        {
-            grounded = false;
-            myAnimator.SetBool("jumping", true);
-        }
     }
 
     void FixedUpdate()
@@ -168,43 +158,91 @@ public class PlayerController:MonoBehaviour
 
 
         // Jumping Forces
-        if (jump)
+        // Check if grounded
+        if (grounded)
         {
-            if (jumpCount <= 2)
+            jumpCount = 0;
+        }
+        // Double Jump Section
+        if (jump && hasDoubleJump)
+        {
+            if (jumpCount <= 1)
             {
+                // Force Not Grounded
+                grounded = false;
+                // Increment Counter upon successful jump
+                jumpCount++;
                 // Add a vertical force to the player.
                 rb.AddForce(Vector2.up * jumpForce);
+                // Play Jump Animation
+                myAnimator.SetBool("jumping", true);
             }
-            else if (jumpCount > 2 && grounded)
+            // Make sure the player can't jump again until the jump conditions from Update are satisfied.
+            jump = false;
+        }
+        // Single Jump Section
+        else if (jump)
+        {
+            if (jumpCount < 1)
             {
-                jumpCount = 0;
+                // Force Not Grounded
+                grounded = false;
+                // Increment Counter upon successful jump
+                jumpCount++;
+                // Add a vertical force to the player.
+                rb.AddForce(Vector2.up * jumpForce);
+                // Play Jump Animation
+                myAnimator.SetBool("jumping", true);
             }
             // Make sure the player can't jump again until the jump conditions from Update are satisfied.
             jump = false;
         }
 
         // Dashing Forces
-        if (dashing)
+        if (dashing && hasDash)
         {
             // Add dash force to the player
             rb.AddForce(Vector2.right * horizontalInput * dashForce);
             // Make sure the player can't dash again until the dash conditions from Update are satisfied.
             dashing = false;
         }
+        else if (dashing)
+        {
+            dashing = false;
+        }
 
         // Animation Updates
-            // Walking Check
-            if (horizontalInput != 0)
-            {
-                isWalking = true;
-            }
-            else
-            {
-                isWalking = false;
-            }
-            myAnimator.SetBool("walking", isWalking);
+        // Walking Check
+        if (horizontalInput != 0)
+        {
+            isWalking = true;
+        }
+        else
+        {
+            isWalking = false;
+        }
+        myAnimator.SetBool("walking", isWalking);
     }
 
+    // Check if player has collided with the ground objects
+    void OnCollisionEnter2D(Collision2D coll)
+    {
+        if (coll.gameObject.tag == "Ground")
+        {
+            grounded = true;
+            myAnimator.SetBool("jumping", false);
+        }
+
+    }
+
+    // Check if the player is no longer colliding with ground objects 
+    void OnCollisionExit2D(Collision2D coll)
+    {
+        if (coll.gameObject.tag == "Ground")
+        {
+            grounded = false;
+        }
+    }
 
     void Flip()
     {
