@@ -130,5 +130,22 @@ public class TriggerController : MonoBehaviour
 
             FinishStatementNum++;
         }
+        if (this.gameObject.tag == "Player")
+        {
+            if (this.gameObject.tag == "Final")
+            {
+                if (Input.GetKeyDown(KeyCode.F)) //press f to interact with the boxes that are left.
+                {
+                    numElements++;
+                    Destroy(gameObject);
+                }
+            }
+           
+        }
+        if(numElements == 3)
+        {
+            Debug.Log("Next Lebel Loading."); //this is filler, you end it how you wanna after the player gets all 4 of the right elements. 
+        }
+    }
     }
 }
